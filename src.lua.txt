@@ -2403,7 +2403,7 @@ function NullUI:CreateWindow(opts)
 		mobileToggle.AnchorPoint = Vector2.new(0, 0)
 		mobileToggle.Position = opts.TogglePosition or UDim2.fromOffset(300, math.floor(bandY))
 		mobileToggle.Size = UDim2.fromOffset(toggleSize, toggleSize)
-		mobileToggle.Image = "rbxassetid://136834285051667"
+		mobileToggle.Image = "rbxassetid://78049724563139"
 		mobileToggle.ZIndex = Z.Toast
 		mobileToggle.Parent = root
 
