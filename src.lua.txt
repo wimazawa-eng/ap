@@ -8321,7 +8321,7 @@ function NullUI:SendFeedbackWebhook(webhookUrl, stars, message, opts)
 		})
 		self:Notify({
 			Title = ok and "Feedback Sent" or "Failed to Send",
-			Text  = ok and "Thanks for rating the UI!" or tostring(err),
+			Text  = ok and "Thanks for rating DracSploit!" or tostring(err),
 			Type  = ok and "success" or "error",
 			Duration = 3,
 		})
