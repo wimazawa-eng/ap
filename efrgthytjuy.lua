@@ -170,11 +170,8 @@ local Library = { } do
     local function ApplyIcon(Object, Icon)
         if not Icon then return end
 
-        local Image, Offset, Size = ResolveIcon(Icon)
-
-        Object.Image = Image
-        Object.ImageRectOffset = ToVector2(Offset)
-        Object.ImageRectSize = ToVector2(Size)
+        local Image = ResolveIcon(Icon)
+Object.Image = Image
     end
 
     local function MeasureText(Text, Size, Width, FontFace)
