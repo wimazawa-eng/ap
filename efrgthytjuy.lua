@@ -645,7 +645,9 @@ Object.Image = Image
                 RestoreResting(Children)
             end
 
-            if Callback then Callback() end
+            if Callback then
+    Library:SafeCall(Callback)
+end
         end)
     end
 
@@ -3811,8 +3813,13 @@ end
                     Items.Page:ResetFade()
                     CleanPage()
 
-                    Items.Page.Instance.Visible = false
-                    Items.Page.Instance.Parent = Library.UnusedHolder.Instance
+                    local page = Items.Page and Items.Page.Instance
+local holder = Library.UnusedHolder and Library.UnusedHolder.Instance
+
+if page and page.Parent and holder then
+    page.Visible = false
+    page.Parent = holder
+end
                 end
 
                 if OnDone then Library:SafeCall(OnDone) end
