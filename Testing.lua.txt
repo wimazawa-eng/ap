@@ -1364,6 +1364,17 @@ end
     do
         local TouchStart
 
+local function IsShown(Object)
+        local Current = Object
+        while Current and Current ~= Library.Holder.Instance do
+            if not Current.Visible then
+                return false
+            end
+            Current = Current.Parent
+        end
+        return true
+    end
+
         Library:Connect(UserInputService.InputBegan, function(Input)
             if Input.UserInputType == Enum.UserInputType.Touch then
                 TouchStart = Input.Position
@@ -1392,16 +1403,7 @@ end
 
             local Best
 
-local function IsShown(Object)
-    local Current = Object
-    while Current and Current ~= Library.Holder.Instance do
-        if not Current.Visible then
-            return false
-        end
-        Current = Current.Parent
-    end
-    return true
-end
+
 
             for _, Data in Library.TouchButtons do
     local Object = Data.Instance
@@ -1413,7 +1415,7 @@ end
         Best = Data
     end
 end
-            end
+
 
             if Best then Best.Fire(Input) end
         end)
