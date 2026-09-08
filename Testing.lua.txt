@@ -1392,15 +1392,27 @@ end
 
             local Best
 
-            for _, Data in Library.TouchButtons do
-                local Object = Data.Instance
-                if not Object or not Object.Visible then continue end
-                if not PointInside(Position, Object) then continue end
-                if Object.ZIndex < ShieldLevel then continue end
+local function IsShown(Object)
+    local Current = Object
+    while Current and Current ~= Library.Holder.Instance do
+        if not Current.Visible then
+            return false
+        end
+        Current = Current.Parent
+    end
+    return true
+end
 
-                if not Best or Object.ZIndex >= Best.Instance.ZIndex then
-                    Best = Data
-                end
+            for _, Data in Library.TouchButtons do
+    local Object = Data.Instance
+    if not Object or not IsShown(Object) then continue end
+    if not PointInside(Position, Object) then continue end
+    if Object.ZIndex < ShieldLevel then continue end
+
+    if not Best or Object.ZIndex >= Best.Instance.ZIndex then
+        Best = Data
+    end
+end
             end
 
             if Best then Best.Fire(Input) end
@@ -1421,13 +1433,14 @@ end
         local Active = false
 
         Hit:Connect("InputBegan", function(Input)
-            local IsClick = Input.UserInputType == Enum.UserInputType.MouseButton1
-            local IsTouch = Input.UserInputType == Enum.UserInputType.Touch
+    local IsClick = Input.UserInputType == Enum.UserInputType.MouseButton1
+    local IsTouch = Input.UserInputType == Enum.UserInputType.Touch
 
-            if not IsClick and not IsTouch then return end
+    if not IsClick and not IsTouch then return end
+    if not Library.UIEnabled then return end
 
-            Active = true
-            Handlers.OnGrab(Input)
+    Active = true
+    Handlers.OnGrab(Input)
 
             if Watcher then return end
 
@@ -1444,13 +1457,13 @@ end
         end)
 
         Library:Connect(UserInputService.InputChanged, function(Input)
-            local IsMove = Input.UserInputType == Enum.UserInputType.MouseMovement
-            local IsTouch = Input.UserInputType == Enum.UserInputType.Touch
+    local IsMove = Input.UserInputType == Enum.UserInputType.MouseMovement
+    local IsTouch = Input.UserInputType == Enum.UserInputType.Touch
 
-            if (IsMove or IsTouch) and Active then
-                Handlers.OnMove(Input)
-            end
-        end)
+    if (IsMove or IsTouch) and Active and Library.UIEnabled then
+        Handlers.OnMove(Input)
+    end
+end)
     end
 
     local function PlaceBelow(GetAnchor)
@@ -4203,12 +4216,11 @@ if not Library.UIEnabled then
         end
 
         Items.Hit:Connect("MouseButton1Down", function()
-
-if not Library.UIEnabled then
+    if not Library.UIEnabled then
         return
     end
-
-        end)
+    Toggle:Set(not Toggle.Value)
+end)
 
         Toggle.SlotX = -58
 
