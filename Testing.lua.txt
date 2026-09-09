@@ -28,9 +28,9 @@ Library.UIEnabled = true
         return cloneref(game:GetService("CoreGui"))
     end
 
-    Library.Directory = "Zolar"
-    Library.ConfigFolder = "Zolar/Configs"
-    Library.AssetsFolder = "Zolar/Assets"
+    Library.Directory = "Aural"
+    Library.ConfigFolder = "Aural/Configs"
+    Library.AssetsFolder = "Aural/Assets"
 
     if isfolder then
         for _, Folder in { Library.Directory, Library.ConfigFolder, Library.AssetsFolder } do
