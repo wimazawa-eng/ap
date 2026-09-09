@@ -392,39 +392,26 @@ Object.Image = Image
     end
 
     Library.Connect = function(Self, Signal, Callback)
-        local Connection
+    local Connection
 
-        if type(Signal) == "string" and Self.Instance then
-            local IsClick = Signal == "MouseButton1Down" or Signal == "MouseButton1Click"
-
-            if IsMobile and IsClick and Self.Instance:IsA("GuiButton") then
-                local LastFire = 0
-
-                local function Fire(Input)
-                    local Now = os.clock()
-                    if Now - LastFire < 0.25 then return end
-                    LastFire = Now
-                    Callback(Input)
+    if type(Signal) == "string" and Self.Instance then
+        if IsMobile and (Signal == "MouseButton1Down" or Signal == "MouseButton1Click") and Self.Instance:IsA("GuiButton") then
+            Connection = Self.Instance.Activated:Connect(function(Input)
+                if not Library.UIEnabled then
+                    return
                 end
-
-                table.insert(Library.TouchButtons, {
-                    Instance = Self.Instance,
-                    Fire = Fire
-                })
-
-                Connection = Self.Instance.Activated:Connect(function(Input)
-                    Fire(Input)
-                end)
-            else
-                Connection = Self.Instance[Signal]:Connect(Callback)
-            end
+                Callback(Input)
+            end)
         else
-            Connection = Signal:Connect(Callback)
+            Connection = Self.Instance[Signal]:Connect(Callback)
         end
-
-        table.insert(Library.Connections, Connection)
-        return Connection
+    else
+        Connection = Signal:Connect(Callback)
     end
+
+    table.insert(Library.Connections, Connection)
+    return Connection
+end
 
     Library.Thread = function(Self, Function)
         local NewThread = coroutine.create(Function)
@@ -1364,26 +1351,6 @@ end
     do
         local TouchStart
 
-local function IsShown(Object)
-    local Current = Object
-
-    while Current and Current ~= Library.Holder.Instance do
-        if Current:IsA("ScreenGui") then
-            if not Current.Enabled then
-                return false
-            end
-        elseif Current:IsA("GuiObject") then
-            if not Current.Visible then
-                return false
-            end
-        end
-
-        Current = Current.Parent
-    end
-
-    return true
-end
-
         Library:Connect(UserInputService.InputBegan, function(Input)
             if Input.UserInputType == Enum.UserInputType.Touch then
                 TouchStart = Input.Position
@@ -1416,7 +1383,7 @@ end
 
             for _, Data in Library.TouchButtons do
     local Object = Data.Instance
-    if not Object or not IsShown(Object) then continue end
+    if not Object then continue end
     if not PointInside(Position, Object) then continue end
     if Object.ZIndex < ShieldLevel then continue end
 
@@ -1815,7 +1782,10 @@ end)
                 Library:Tween({ BackgroundTransparency = 1 }, nil, Built.Row.Instance)
             end)
 
-            Built.Hit:Connect("Activated", function()
+            Built.Hit:Connect("MouseButton1Down", function()
+    if not Library.UIEnabled then
+        return
+    end
     Popup.OnPick(Data)
 end)
 
