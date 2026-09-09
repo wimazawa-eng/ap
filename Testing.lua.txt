@@ -1714,7 +1714,7 @@ end)
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
             CanvasSize = UDim2.fromOffset(0, 0),
             Size = UDim2.new(1, 0, 1, 0),
-            ZIndex = Level + 4,
+            ZIndex = Level + 4
             BorderSizePixel = 0
         })
 
@@ -5131,10 +5131,8 @@ end)
             return Dropdown.Value
         end
 
-        Items.Hit:Connect("Activated", function()
-    if not Library.UIEnabled then
-        return
-    end
+        Items.Hit:Connect("MouseButton1Down", function()
+    if not Library.UIEnabled then return end
     Popup:SetOpen(not Popup.IsOpen)
 end)
 
