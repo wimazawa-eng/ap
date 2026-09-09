@@ -1714,7 +1714,7 @@ end)
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
             CanvasSize = UDim2.fromOffset(0, 0),
             Size = UDim2.new(1, 0, 1, 0),
-            ZIndex = Level + 4
+            ZIndex = Level + 4,
             BorderSizePixel = 0
         })
 
