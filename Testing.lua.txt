@@ -2217,37 +2217,44 @@ end)
     end
 
     local function CaptureKey(State, Display, OnPicked)
-        if State.Picking then return end
+    if State.Picking then return end
 
-        State.Picking = true
-        Library.Binding = true
-        Display.Text = ". . ."
+    State.Picking = true
+    Library.Binding = true
+    Display.Text = ". . ."
 
-        task.wait()
+    task.wait()
 
-        local Connection
+    local Connection
 
-        Connection = UserInputService.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseMovement then return end
+    Connection = UserInputService.InputBegan:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.MouseMovement then return end
 
-            Connection:Disconnect()
+        -- ignore stick drift, only accept actual button presses
+        if Input.KeyCode == Enum.KeyCode.Thumbstick1
+        or Input.KeyCode == Enum.KeyCode.Thumbstick2 then
+            return
+        end
 
-            local IsBack = Input.KeyCode == Enum.KeyCode.Backspace
-            local IsEsc = Input.KeyCode == Enum.KeyCode.Escape
+        Connection:Disconnect()
 
-            if IsBack or IsEsc then
-                OnPicked(nil)
-            elseif Input.UserInputType == Enum.UserInputType.Keyboard then
-                OnPicked(Input.KeyCode)
-            else
-                OnPicked(Input.UserInputType)
-            end
+        local IsBack = Input.KeyCode == Enum.KeyCode.Backspace
+        local IsEsc = Input.KeyCode == Enum.KeyCode.Escape
+        local IsGamepad = string.sub(Input.UserInputType.Name, 1, 7) == "Gamepad"
 
-            task.defer(function()
-                Library.Binding = false
-            end)
+        if IsBack or IsEsc then
+            OnPicked(nil)
+        elseif Input.UserInputType == Enum.UserInputType.Keyboard or IsGamepad then
+            OnPicked(Input.KeyCode)
+        else
+            OnPicked(Input.UserInputType)
+        end
+
+        task.defer(function()
+            Library.Binding = false
         end)
-    end
+    end)
+end
 
     local function KeyMatches(Input, Key)
         return Input.KeyCode == Key or Input.UserInputType == Key
