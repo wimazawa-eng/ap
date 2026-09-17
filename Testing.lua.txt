@@ -195,7 +195,7 @@ Object.Image = Image
     end
 
     Library.__index = Library
-    Library.Version = "1.1"
+    Library.Version = "1.8"
     Library.WindowWidth = 716
     Library.WindowHeight = 540
 
@@ -211,6 +211,8 @@ Object.Image = Image
         DimIcon = Color3.fromRGB(120, 120, 120),
         Accent = Color3.fromRGB(179, 165, 255)
     }
+
+Library.Theme.BackgroundAlpha = 0
 
     Library.AccentPresets = {
         Color3.fromRGB(179, 165, 255),
@@ -711,6 +713,17 @@ end
             end)
         end
     end
+
+Library.SetBackgroundTransparency = function(Self, Alpha)
+    Alpha = math.clamp(Alpha, 0, 1)
+    Library.Theme.BackgroundAlpha = Alpha
+
+    for _, Window in Library.Windows do
+        local Main = Window.Items.Main.Instance
+        Main.BackgroundTransparency = Alpha
+        Library:SetBaseline(Main, "BackgroundTransparency", Alpha)
+    end
+end
 
     Library.SetAccent = function(Self, Color)
         Library.Theme.Accent = Color
