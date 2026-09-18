@@ -2979,6 +2979,9 @@ end
             Picking = false,
             Host = Profile
         }
+        Library.OnMenuKeyChanged = function()
+    KeyText.Instance.Text = KeyName(Library.MenuKeybind)
+end
 
         local function KeyPlace(Off)
             local Anchor = KeyIcon.Instance
@@ -6077,7 +6080,7 @@ if not Library.UIEnabled then
                 TextSize = 15,
                 Anchor = Vector2.new(0, 0.5),
                 Pos = UDim2.new(0, 15, 0.5, 0),
-                Size = UDim2.fromOffset(ColW - 130, 20),
+                Size = UDim2.fromOffset(ColW - 156, 20),
                 Color = "DimText",
                 Truncate = true,
                 Z = 5
@@ -6088,6 +6091,58 @@ if not Library.UIEnabled then
                 Slot = Slot,
                 Row = Row
             }
+
+            local AutoImage = MakeImage({
+    Parent = Row.Instance,
+    Icon = "zap",
+    Anchor = Vector2.new(1, 0.5),
+    Pos = UDim2.new(1, -94, 0.5, 0),
+    Size = UDim2.fromOffset(15, 15),
+    Color = "DimText",
+    Z = 5
+})
+
+local AutoHit = MakeButton({
+    Parent = Row.Instance,
+    Anchor = Vector2.new(1, 0.5),
+    Pos = UDim2.new(1, -87, 0.5, 0),
+    Size = UDim2.fromOffset(28, 28),
+    Z = 6
+})
+
+function Data:SetAutoloadVisual(Active)
+    Data.IsAutoload = Active
+    AutoImage:ChangeItemTheme({ ImageColor3 = Active and "Accent" or "DimText" })
+    AutoImage:Tween({ ImageColor3 = Active and Library.Theme.Accent or Library.Theme.DimText })
+end
+
+AutoHit:OnHover(function()
+    if Data.IsAutoload then return end
+    AutoImage:Tween({ ImageColor3 = Library.Theme.Text })
+end, function()
+    if Data.IsAutoload then return end
+    AutoImage:Tween({ ImageColor3 = Library.Theme.DimText })
+end)
+
+AutoHit:Connect("MouseButton1Down", function()
+    local Enabled = Library:GetAutoload() ~= Name
+
+    if Enabled then
+        Library:SetAutoload(Name)
+    else
+        Library:ClearAutoload()
+    end
+
+    for _, Other in Config.Rows do
+        Other:SetAutoloadVisual(Enabled and Other.Name == Name)
+    end
+
+    Library:Notification({
+        Name = Enabled and "Autoload set" or "Autoload cleared",
+        Description = Enabled and ("\"" .. Name .. "\" will load on execute.") or "No config will autoload.",
+        Icon = "zap"
+    })
+end)
 
             local function IconButton(Offset, Icon, Callback)
                 local Image = MakeImage({
@@ -6151,6 +6206,9 @@ if not Library.UIEnabled then
             IconButton(-14, "trash-2", function()
                 if Data.Removing then return end
                 Data.Removing = true
+                    if Library:GetAutoload() == Name then
+        Library:ClearAutoload()
+    end
 
                 if delfile and isfile and isfile(ConfigPath(Name)) then
                     delfile(ConfigPath(Name))
@@ -6198,7 +6256,7 @@ if not Library.UIEnabled then
 
             local Hit = MakeButton({
                 Parent = Row.Instance,
-                Size = UDim2.new(1, -96, 1, 0),
+                Size = UDim2.new(1, -122, 1, 0),
                 Z = 5
             })
 
@@ -6237,6 +6295,7 @@ if not Library.UIEnabled then
             for Index, Name in Library:ListConfigs() do
                 local Data = AddRow(Index, Name)
                 Data:SetSelected(Name == Config.Selected)
+                Data:SetAutoloadVisual(Name == Library:GetAutoload())
             end
 
             local Height = #Config.Rows * 52
@@ -6505,6 +6564,7 @@ if not Library.UIEnabled then
         end
 
         Config.__accent = Library.Theme.Accent:ToHex()
+        Config.__menukey = Library.MenuKeybind and tostring(Library.MenuKeybind) or "None"
         Config.__theme = ThemeColors
         Config.__created = Created or os.date("%d.%m.%Y %H:%M")
         Config.__version = Library.Version
@@ -6519,7 +6579,17 @@ if not Library.UIEnabled then
         end)
 
         if not Ok or type(Decoded) ~= "table" then return false end
+        if type(Decoded.__menukey) == "string" then
+    local Key = ParseKey(Decoded.__menukey)
 
+    if Key then
+        Library.MenuKeybind = Key
+
+        if Library.OnMenuKeyChanged then
+            Library.OnMenuKeyChanged()
+        end
+    end
+end
         Library.Silent = true
 
         for Index, Value in Decoded do
@@ -6558,6 +6628,51 @@ if not Library.UIEnabled then
         writefile(Library.ConfigFolder .. "/" .. Name .. ".json", Library:GetConfig())
         return true
     end
+
+    Library.AutoloadPath = function(Self)
+    return Library.Directory .. "/autoload.txt"
+end
+
+Library.GetAutoload = function(Self)
+    if not isfile or not isfile(Library:AutoloadPath()) then return nil end
+
+    local Name = string.match(readfile(Library:AutoloadPath()), "^%s*(.-)%s*$")
+    if not Name or Name == "" then return nil end
+
+    if not isfile(Library.ConfigFolder .. "/" .. Name .. ".json") then return nil end
+
+    return Name
+end
+
+Library.SetAutoload = function(Self, Name)
+    if not writefile then return false end
+    writefile(Library:AutoloadPath(), Name)
+    return true
+end
+
+Library.ClearAutoload = function(Self)
+    if delfile and isfile and isfile(Library:AutoloadPath()) then
+        delfile(Library:AutoloadPath())
+    end
+end
+
+Library.LoadAutoload = function(Self)
+    local Name = Library:GetAutoload()
+    if not Name then return false end
+
+    local Ok = Library:LoadConfigFile(Name)
+
+    if Ok then
+        Library:Notification({
+            Name = "Autoload",
+            Description = "Loaded config \"" .. Name .. "\".",
+            Icon = "zap",
+            Duration = 3
+        })
+    end
+
+    return Ok
+end
 
     Library.LoadConfigFile = function(Self, Name)
         if not isfile then return false end
