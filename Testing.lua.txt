@@ -945,57 +945,65 @@ end
         or Color3.fromRGB(35, 35, 35)
 end
 
-    button.InputBegan:Connect(function(input)
-        if input.UserInputType ~= Enum.UserInputType.Touch
-        and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
-            return
-        end
+    local dragTouch = nil
 
-        dragging = true
-        moved = false
-        dragstart = input.Position
-        startpos = button.Position
+button.InputBegan:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+        return
+    end
 
-        local connection
-        connection = input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
+    dragging = true
+    moved = false
+    dragstart = input.Position
+    startpos = button.Position
+    dragTouch = input
 
-                if connection then
-                    connection:Disconnect()
-                    connection = nil
-                end
+    local connection
+    connection = input.Changed:Connect(function()
+        if input.UserInputState == Enum.UserInputState.End then
+            dragging = false
+            dragTouch = nil
 
-                if not moved then
-                    toggle()
-                end
+            if connection then
+                connection:Disconnect()
+                connection = nil
             end
-        end)
+
+            if not moved then
+                toggle()
+            end
+        end
     end)
+end)
 
-    UserInputService.InputChanged:Connect(function(input)
-        if not dragging then
-            return
-        end
+UserInputService.InputChanged:Connect(function(input)
+    if not dragging then
+        return
+    end
 
-        if input.UserInputType ~= Enum.UserInputType.Touch
-        and input.UserInputType ~= Enum.UserInputType.MouseMovement then
-            return
-        end
+    if input ~= dragTouch then
+        return
+    end
 
-        local delta = input.Position - dragstart
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then
+        return
+    end
 
-        if delta.Magnitude > 6 then
-            moved = true
-        end
+    local delta = input.Position - dragstart
 
-        button.Position = UDim2.new(
-            startpos.X.Scale,
-            startpos.X.Offset + delta.X,
-            startpos.Y.Scale,
-            startpos.Y.Offset + delta.Y
-        )
-    end)
+    if delta.Magnitude > 6 then
+        moved = true
+    end
+
+    button.Position = UDim2.new(
+        startpos.X.Scale,
+        startpos.X.Offset + delta.X,
+        startpos.Y.Scale,
+        startpos.Y.Offset + delta.Y
+    )
+end)
 
     Library.MobileToggle = gui
 end
