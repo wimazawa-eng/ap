@@ -2227,21 +2227,27 @@ end)
     end
 
     local function ParseKey(Value)
-        if type(Value) ~= "string" or Value == "None" then
-            return nil
-        end
-
-        local Name = string.gsub(Value, "Enum.KeyCode.", "")
-        Name = string.gsub(Name, "Enum.UserInputType.", "")
-
-        local Ok, Key = pcall(function()
-            return Enum.KeyCode[Name]
-        end)
-
-        if Ok and Key then return Key end
-
+    if type(Value) ~= "string" or Value == "None" then
         return nil
     end
+
+    local Name = string.gsub(Value, "Enum.KeyCode.", "")
+    Name = string.gsub(Name, "Enum.UserInputType.", "")
+
+    local Ok, Key = pcall(function()
+        return Enum.KeyCode[Name]
+    end)
+
+    if Ok and Key then return Key end
+
+    local Ok2, Input = pcall(function()
+        return Enum.UserInputType[Name]
+    end)
+
+    if Ok2 and Input then return Input end
+
+    return nil
+end
 
     local function CaptureKey(State, Display, OnPicked)
     if State.Picking then return end
@@ -5154,7 +5160,7 @@ end
                     if Data.Name == Value then Found = true end
                 end
 
-                if not Found then return end
+                if not Found then Dropdown.Pending = Value return end
 
                 Dropdown.Value = Value
 
@@ -5338,7 +5344,7 @@ if not Library.UIEnabled then
             Name = Params.Name or "Keybind",
             Key = Params.Default,
             Flag = Params.Flag,
-            Callback = Params.Callback or function() end,
+            OnChanged = Params.OnChanged,
             Picking = false,
             IsOpen = false,
             Debounce = false,
@@ -5436,14 +5442,16 @@ if not Library.UIEnabled then
         })
 
         function Keybind:Set(Key)
-            Keybind.Key = Key
-            PanelKey.Instance.Text = KeyName(Key)
-            Keybind.Picking = false
+    Keybind.Key = Key
+    PanelKey.Instance.Text = KeyName(Key)
+    Keybind.Picking = false
 
-            if Keybind.Flag then
-                Library.Flags[Keybind.Flag] = Key and tostring(Key) or "None"
-            end
-        end
+    if Keybind.Flag then
+        Library.Flags[Keybind.Flag] = Key and tostring(Key) or "None"
+    end
+
+    Library:SafeCall(Keybind.OnChanged, Key)
+end
 
         function Keybind:Get()
             return Keybind.Key
@@ -6602,15 +6610,19 @@ end
         Library.Silent = true
 
         for Index, Value in Decoded do
-            local SetFunction = Library.SetFlags[Index]
-            if not SetFunction then continue end
+    local SetFunction = Library.SetFlags[Index]
+    if not SetFunction then continue end
 
-            if type(Value) == "table" and Value.__color then
-                SetFunction(Color3.fromHex(Value.__color), Value.__alpha)
-            else
-                SetFunction(Value)
-            end
+    local Ok, Err = pcall(function()
+        if type(Value) == "table" and Value.__color then
+            SetFunction(Color3.fromHex(Value.__color), Value.__alpha)
+        else
+            SetFunction(Value)
         end
+    end)
+
+    if not Ok then warn("[config] flag failed:", Index, Err) end
+end
 
         if type(Decoded.__theme) == "table" then
             for Key, Hex in Decoded.__theme do
