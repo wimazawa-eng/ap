@@ -177,22 +177,25 @@ Object.Image = Image
     end
 
     local function MeasureText(Text, Size, Width, FontFace)
-        local Ok, Bounds = pcall(function()
-            return TextService:GetTextBoundsAsync({
-                Text = Text,
-                Font = FontFace or UiFont,
-                Size = Size,
-                Width = Width
-            })
-        end)
+    local Ok, Bounds = pcall(function()
+        return TextService:GetTextBoundsAsync({
+            Text = Text,
+            Font = FontFace or UiFont,
+            Size = Size,
+            Width = Width
+        })
+    end)
 
-        if Ok and Bounds then
-            return Bounds
-        end
-
-        local Estimate = math.min(#Text * Size * 0.52, Width)
-        return Vector2.new(Estimate, Size * 1.25)
+    if Ok and Bounds then
+        return Bounds
     end
+
+    local CharWidth = Size * 0.52
+    local PerLine = math.max(1, math.floor(Width / CharWidth))
+    local Lines = math.max(1, math.ceil(#Text / PerLine))
+
+    return Vector2.new(math.min(#Text * CharWidth, Width), Lines * Size * 1.25)
+end
 
     Library.__index = Library
     Library.Version = "2.0"
