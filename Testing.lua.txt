@@ -5128,13 +5128,15 @@ end)
         end
 
         function Dropdown:Refresh(List)
-            Popup:Clear()
-            Dropdown.Options = List
-
-            for _, Option in List do
-                Popup:AddRow(tostring(Option))
-            end
-        end
+    Popup:Clear()
+    Dropdown.Options = List
+    for _, Option in List do Popup:AddRow(tostring(Option)) end
+    if Dropdown.Pending ~= nil then
+        local P = Dropdown.Pending
+        Dropdown.Pending = nil
+        Dropdown:Set(P)
+    end
+end
 
         function Dropdown:Set(Value)
             if Dropdown.Multi then
@@ -6312,6 +6314,7 @@ end)
             PlaySweep(Items.CreateSweep.Instance)
 
             local Name = string.gsub(Items.NameInput.Instance.Text, "[^%w _%-]", "")
+            Name = string.match(Name, "^%s*(.-)%s*$")
 
             if Name == "" then
                 Library:Notification({
