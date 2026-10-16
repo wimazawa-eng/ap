@@ -6379,6 +6379,18 @@ end)
     return false
 end
 
+local function UniqueName(Base)
+    local Name = Base
+    local Count = 1
+
+    while isfile and isfile(ConfigPath(Name)) do
+        Count += 1
+        Name = Base .. " " .. Count
+    end
+
+    return Name
+end
+
 local function TryImport(Raw)
     Raw = string.match(Raw or "", "^%s*(.-)%s*$")
     if Raw == "" then return false end
@@ -6396,11 +6408,40 @@ local function TryImport(Raw)
         RefreshThemeUI()
     end
 
-    Library:Notification({
-        Name = "Config imported",
-        Description = "Values were loaded from the pasted config.",
-        Icon = "check"
-    })
+    -- save it as a real config so it shows up in the list
+    local Name = string.gsub(Items.NameInput.Instance.Text, "[^%w _%-]", "")
+    Name = string.match(Name, "^%s*(.-)%s*$")
+
+    if Name == "" then
+        Name = "imported"
+    end
+
+    Name = UniqueName(Name)
+
+    local Saved = false
+
+    if writefile then
+        Saved = pcall(writefile, ConfigPath(Name), Raw)
+    end
+
+    if Saved then
+        Items.NameInput.Instance.Text = ""
+        Config.Selected = Name
+        RefreshList()
+        ShowInfo(Name)
+
+        Library:Notification({
+            Name = "Config imported",
+            Description = "Saved as \"" .. Name .. "\" and loaded.",
+            Icon = "check"
+        })
+    else
+        Library:Notification({
+            Name = "Config imported",
+            Description = "Loaded, but it couldn't be saved to a file.",
+            Icon = "triangle-alert"
+        })
+    end
 
     return true
 end
