@@ -5758,11 +5758,75 @@ if not Library.UIEnabled then
         })
 
         Items.ListHolder = MakeFrame({
-            Parent = Page.Instance,
-            Pos = UDim2.fromOffset(0, 52),
-            Size = UDim2.fromOffset(ColW, ContentH - 52),
-            Z = 3
+	    Parent = Page.Instance,
+	    Pos = UDim2.fromOffset(0, 104),
+	    Size = UDim2.fromOffset(ColW, ContentH - 104),
+	    Z = 3
         })
+
+        Items.ImportBox = MakeFrame({
+    Parent = Page.Instance,
+    Pos = UDim2.fromOffset(0, 52),
+    Size = UDim2.fromOffset(ColW, 40),
+    Z = 3
+})
+
+Items.ImportField = MakeFrame({
+    Parent = Items.ImportBox.Instance,
+    Size = UDim2.fromOffset(ColW - 94, 40),
+    Color = "Element",
+    Round = 6,
+    Clip = true,
+    Z = 4
+})
+
+MakeImage({
+    Parent = Items.ImportField.Instance,
+    Icon = "clipboard",
+    Anchor = Vector2.new(0, 0.5),
+    Pos = UDim2.new(0, 12, 0.5, 0),
+    Size = UDim2.fromOffset(14, 14),
+    Color = "DimText",
+    Z = 5
+})
+
+Items.ImportInput = MakeInput({
+    Parent = Items.ImportField.Instance,
+    Placeholder = "paste config json",
+    Pos = UDim2.fromOffset(34, 0),
+    Size = UDim2.new(1, -44, 1, 0),
+    TextSize = 15,
+    Z = 5
+})
+
+Items.Import = MakeFrame({
+    Parent = Items.ImportBox.Instance,
+    Anchor = Vector2.new(1, 0),
+    Pos = UDim2.new(1, 0, 0, 0),
+    Size = UDim2.fromOffset(84, 40),
+    Color = "Element",
+    Round = 6,
+    Clip = true,
+    Z = 4
+})
+
+HoverSwap(Items.Import)
+Items.ImportSweep = MakeSweep(Items.Import.Instance, 5)
+
+MakeText({
+    Parent = Items.Import.Instance,
+    Text = "Import",
+    TextSize = 15,
+    Size = UDim2.new(1, 0, 1, 0),
+    Color = "Text",
+    Align = Enum.TextXAlignment.Center,
+    Z = 6
+})
+
+Items.ImportHit = MakeButton({
+    Parent = Items.Import.Instance,
+    Z = 7
+})
 
         Items.List = Library:Create("ScrollingFrame", {
             Parent = Items.ListHolder.Instance,
@@ -6304,6 +6368,84 @@ end)
             return Data
         end
 
+        local function IsValidConfig(Decoded)
+    if type(Decoded) ~= "table" then return false end
+    if Decoded.__version or Decoded.__theme or Decoded.__accent then return true end
+
+    for Key in Decoded do
+        if Library.SetFlags[Key] then return true end
+    end
+
+    return false
+end
+
+local function TryImport(Raw)
+    Raw = string.match(Raw or "", "^%s*(.-)%s*$")
+    if Raw == "" then return false end
+
+    local Ok, Decoded = pcall(function()
+        return HttpService:JSONDecode(Raw)
+    end)
+
+    if not Ok or not IsValidConfig(Decoded) then return false end
+    if not Library:LoadConfig(Raw) then return false end
+
+    Items.ImportInput.Instance.Text = ""
+
+    if RefreshThemeUI then
+        RefreshThemeUI()
+    end
+
+    Library:Notification({
+        Name = "Config imported",
+        Description = "Values were loaded from the pasted config.",
+        Icon = "check"
+    })
+
+    return true
+end
+
+local function ImportFailed()
+    Items.ImportInput.Instance.Text = ""
+
+    Library:Notification({
+        Name = "Import failed",
+        Description = "That text isn't a valid config.",
+        Icon = "triangle-alert"
+    })
+end
+
+-- auto-load the moment a valid config is pasted
+Library:Connect(Items.ImportInput.Instance:GetPropertyChangedSignal("Text"), function()
+    TryImport(Items.ImportInput.Instance.Text)
+end)
+
+-- if they leave the box with something that never parsed, tell them
+Items.ImportInput:Connect("FocusLost", function()
+    if Items.Import:IsMouseOverFrame() then return end
+
+    local Text = Items.ImportInput.Instance.Text
+    if Text ~= "" and not TryImport(Text) then
+        ImportFailed()
+    end
+end)
+
+-- button: use typed/pasted text, or fall back to the real clipboard
+Items.ImportHit:Connect("MouseButton1Down", function()
+    PlaySweep(Items.ImportSweep.Instance)
+
+    local Raw = Items.ImportInput.Instance.Text
+
+    if Raw == "" and getclipboard then
+        local Ok, Clip = pcall(getclipboard)
+        if Ok then Raw = Clip end
+    end
+
+    if not TryImport(Raw) then
+        ImportFailed()
+    end
+end)
+
         RefreshList = function()
             for _, Data in Config.Rows do
                 Data.Slot.Instance:Destroy()
@@ -6361,11 +6503,12 @@ end)
         end)
 
         local Blocks = {
-            { Frame = Items.CreateBox, Home = UDim2.fromOffset(0, 0) },
-            { Frame = Items.ListHolder, Home = UDim2.fromOffset(0, 52) },
-            { Frame = Items.InfoPanel, Home = UDim2.fromOffset(Col2X, 0) },
-            { Frame = Items.ThemePanel, Home = UDim2.fromOffset(Col2X, 216) }
-        }
+    { Frame = Items.CreateBox, Home = UDim2.fromOffset(0, 0) },
+    { Frame = Items.ImportBox, Home = UDim2.fromOffset(0, 52) },
+    { Frame = Items.ListHolder, Home = UDim2.fromOffset(0, 104) },
+    { Frame = Items.InfoPanel, Home = UDim2.fromOffset(Col2X, 0) },
+    { Frame = Items.ThemePanel, Home = UDim2.fromOffset(Col2X, 216) }
+}
 
         local BlockSlide = 30
         local BlockStep = 0.06
