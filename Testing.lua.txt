@@ -5728,6 +5728,14 @@ if not Library.UIEnabled then
             Z = 5
         })
 
+        Library:Connect(Items.NameInput.Instance:GetPropertyChangedSignal("Text"), function()
+        local Text = Items.NameInput.Instance.Text
+
+        if #Text > 20 then
+            Items.NameInput.Instance.Text = string.sub(Text, 1, 20)
+        end
+    end)
+
         Items.Create = MakeFrame({
             Parent = Items.CreateBox.Instance,
             Anchor = Vector2.new(1, 0),
@@ -6380,6 +6388,7 @@ end)
 end
 
 local function UniqueName(Base)
+    Base = string.sub(Base, 1, 16)
     local Name = Base
     local Count = 1
 
@@ -6518,6 +6527,11 @@ end)
                 })
 
                 return
+            end
+
+            if #Name > 20 then
+                Name = string.sub(Name, 1, 20)
+                Name = string.match(Name, "^%s*(.-)%s*$")
             end
 
             if isfile and isfile(ConfigPath(Name)) then
