@@ -177,22 +177,25 @@ Object.Image = Image
     end
 
     local function MeasureText(Text, Size, Width, FontFace)
-        local Ok, Bounds = pcall(function()
-            return TextService:GetTextBoundsAsync({
-                Text = Text,
-                Font = FontFace or UiFont,
-                Size = Size,
-                Width = Width
-            })
-        end)
+    local Ok, Bounds = pcall(function()
+        return TextService:GetTextBoundsAsync({
+            Text = Text,
+            Font = FontFace or UiFont,
+            Size = Size,
+            Width = Width
+        })
+    end)
 
-        if Ok and Bounds then
-            return Bounds
-        end
-
-        local Estimate = math.min(#Text * Size * 0.52, Width)
-        return Vector2.new(Estimate, Size * 1.25)
+    if Ok and Bounds then
+        return Bounds
     end
+
+    local CharWidth = Size * 0.52
+    local PerLine = math.max(1, math.floor(Width / CharWidth))
+    local Lines = math.max(1, math.ceil(#Text / PerLine))
+
+    return Vector2.new(math.min(#Text * CharWidth, Width), Lines * Size * 1.25)
+end
 
     Library.__index = Library
     Library.Version = "2.0"
@@ -864,22 +867,29 @@ end
     end
 
     Library.Unload = function(Self)
-        for _, Connection in Library.Connections do
-            pcall(function()
-                Connection:Disconnect()
-            end)
-        end
-
-        for _, Thread in Library.Threads do
-            pcall(coroutine.close, Thread)
-        end
-
-        for _, Root in { Library.Holder, Library.PopupHolder, Library.UnusedHolder } do
-            if Root then Root.Instance:Destroy() end
-        end
-
-        getgenv().Zolar = nil
+    for _, Connection in Library.Connections do
+        pcall(function()
+            Connection:Disconnect()
+        end)
     end
+
+    for _, Thread in Library.Threads do
+        pcall(coroutine.close, Thread)
+    end
+
+    for _, Root in { Library.Holder, Library.PopupHolder, Library.UnusedHolder } do
+        if Root then Root.Instance:Destroy() end
+    end
+
+    if Library.MobileToggle then
+        pcall(function()
+            Library.MobileToggle:Destroy()
+        end)
+        Library.MobileToggle = nil
+    end
+
+    getgenv().Zolar = nil
+end
 
     Library.Holder = Library:Create("ScreenGui", {
         Parent = GetHui(),
@@ -892,6 +902,10 @@ end
 
     function Library:CreateMobileToggle()
     if not IsMobile then
+        return
+    end
+
+    if Library.MobileToggle and Library.MobileToggle.Parent then
         return
     end
 
@@ -929,81 +943,76 @@ end
     local dragstart
     local startpos
     local moved = false
-
-    local function toggle()
-    local window = Library.Windows[1]
-    if not window then
-        return
-    end
-
-    enabled = not enabled
-    Library.UIEnabled = enabled
-    window:SetOpen(enabled)
-
-    button.BackgroundColor3 = enabled
-        and Color3.fromRGB(60, 60, 60)
-        or Color3.fromRGB(35, 35, 35)
-end
-
     local dragTouch = nil
 
-button.InputBegan:Connect(function(input)
-    if input.UserInputType ~= Enum.UserInputType.Touch
-    and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
-        return
-    end
-
-    dragging = true
-    moved = false
-    dragstart = input.Position
-    startpos = button.Position
-    dragTouch = input
-
-    local connection
-    connection = input.Changed:Connect(function()
-        if input.UserInputState == Enum.UserInputState.End then
-            dragging = false
-            dragTouch = nil
-
-            if connection then
-                connection:Disconnect()
-                connection = nil
-            end
-
-            if not moved then
-                toggle()
-            end
+    local function toggle()
+        local window = Library.Windows[1]
+        if not window then
+            return
         end
+
+        enabled = not enabled
+        Library.UIEnabled = enabled
+        window:SetOpen(enabled)
+
+        button.BackgroundColor3 = enabled
+            and Color3.fromRGB(60, 60, 60)
+            or Color3.fromRGB(35, 35, 35)
+    end
+
+    Library:Connect(button.InputBegan, function(input)
+        if input.UserInputType ~= Enum.UserInputType.Touch
+        and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+            return
+        end
+
+        dragging = true
+        moved = false
+        dragstart = input.Position
+        startpos = button.Position
+        dragTouch = input
+
+        local connection
+        connection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                dragTouch = nil
+
+                if connection then
+                    connection:Disconnect()
+                    connection = nil
+                end
+
+                if not moved then
+                    toggle()
+                end
+            end
+        end)
     end)
-end)
 
-UserInputService.InputChanged:Connect(function(input)
-    if not dragging then
-        return
-    end
+    Library:Connect(UserInputService.InputChanged, function(input)
+        if not dragging or input ~= dragTouch then
+            return
+        end
 
-    if input ~= dragTouch then
-        return
-    end
+        if input.UserInputType ~= Enum.UserInputType.Touch
+        and input.UserInputType ~= Enum.UserInputType.MouseMovement then
+            return
+        end
 
-    if input.UserInputType ~= Enum.UserInputType.Touch
-    and input.UserInputType ~= Enum.UserInputType.MouseMovement then
-        return
-    end
+        local delta = input.Position - dragstart
 
-    local delta = input.Position - dragstart
+        if delta.Magnitude > 6 then
+            moved = true
+        end
 
-    if delta.Magnitude > 6 then
-        moved = true
-    end
-
-    button.Position = UDim2.new(
-        startpos.X.Scale,
-        startpos.X.Offset + delta.X,
-        startpos.Y.Scale,
-        startpos.Y.Offset + delta.Y
-    )
-end)
+        button.Position = UDim2.new(
+            startpos.X.Scale,
+            startpos.X.Offset + delta.X,
+            startpos.Y.Scale,
+            startpos.Y.Offset + delta.Y
+        )
+    end)
 
     Library.MobileToggle = gui
 end
@@ -2221,21 +2230,27 @@ end)
     end
 
     local function ParseKey(Value)
-        if type(Value) ~= "string" or Value == "None" then
-            return nil
-        end
-
-        local Name = string.gsub(Value, "Enum.KeyCode.", "")
-        Name = string.gsub(Name, "Enum.UserInputType.", "")
-
-        local Ok, Key = pcall(function()
-            return Enum.KeyCode[Name]
-        end)
-
-        if Ok and Key then return Key end
-
+    if type(Value) ~= "string" or Value == "None" then
         return nil
     end
+
+    local Name = string.gsub(Value, "Enum.KeyCode.", "")
+    Name = string.gsub(Name, "Enum.UserInputType.", "")
+
+    local Ok, Key = pcall(function()
+        return Enum.KeyCode[Name]
+    end)
+
+    if Ok and Key then return Key end
+
+    local Ok2, Input = pcall(function()
+        return Enum.UserInputType[Name]
+    end)
+
+    if Ok2 and Input then return Input end
+
+    return nil
+end
 
     local function CaptureKey(State, Display, OnPicked)
     if State.Picking then return end
@@ -2979,6 +2994,9 @@ end
             Picking = false,
             Host = Profile
         }
+        Library.OnMenuKeyChanged = function()
+    KeyText.Instance.Text = KeyName(Library.MenuKeybind)
+end
 
         local function KeyPlace(Off)
             local Anchor = KeyIcon.Instance
@@ -4063,23 +4081,6 @@ if not Library.UIEnabled then
         Params = Params or { }
 
         local Section = Self
-       if Params.List then
-            local ListName = type(Params.List) == "string" and Params.List or Params.Name or "Toggle"
-            local UserCallback = Params.Callback
-
-            Params.Callback = function(Value)
-                Library.ListState = Library.ListState or { }
-                Library.ListState[ListName] = Value and true or false
-
-                if Library.ArrayListBar then
-                    Library.ArrayListBar:Set(ListName, Value)
-                end
-
-                if UserCallback then
-                    UserCallback(Value)
-                end
-            end
-        end
 
         local Toggle = {
             Name = Params.Name or "Toggle",
@@ -4794,6 +4795,35 @@ end)
         Slider.Items = Items
         Items.Knob = MakeKnob(Items.Track.Instance)
 
+        Items.Value.Instance.Visible = false -- hide the old label, the box replaces it
+
+Items.Input = MakeInput({
+    Parent = Items.Row.Instance,
+    Pos = UDim2.new(1, -95, 0, 3),
+    Size = UDim2.fromOffset(80, 20),
+    TextSize = 15,
+    Align = Enum.TextXAlignment.Right,
+    Z = 9
+})
+
+Items.Input:ChangeItemTheme({ TextColor3 = "DimText", PlaceholderColor3 = "DimText" })
+Items.Input.Instance.TextColor3 = Library.Theme.DimText
+
+Items.Input:Connect("Focused", function()
+    -- show only the number while editing
+    Items.Input.Instance.Text = tostring(Slider.Value)
+end)
+
+Items.Input:Connect("FocusLost", function()
+    local Typed = tonumber(string.match(Items.Input.Instance.Text, "-?%d+%.?%d*"))
+
+    if Typed then
+        Slider:Set(Typed)
+    else
+        Items.Input.Instance.Text = tostring(Slider.Value) .. Slider.Suffix
+    end
+end)
+
         function Slider:Set(Value, Instant)
             local Clamped = math.clamp(Value, Slider.Min, Slider.Max)
             Slider.Value = Library:Round(Clamped, Slider.Decimals)
@@ -4809,7 +4839,12 @@ end)
             Library:Tween({ Size = UDim2.fromOffset(Fraction * TrackW, 10) }, Info, Items.Fill.Instance)
             Library:Tween({ Position = UDim2.new(Fraction, 0, 0.5, 0) }, Info, Items.Knob.Instance)
 
-            Items.Value.Instance.Text = tostring(Slider.Value) .. Slider.Suffix
+            local Display = tostring(Slider.Value) .. Slider.Suffix
+            Items.Value.Instance.Text = Display
+
+            if not Items.Input.Instance:IsFocused() then
+            Items.Input.Instance.Text = Display
+        end
             Library:SafeCall(Slider.Callback, Slider.Value)
         end
 
@@ -5136,13 +5171,15 @@ end)
         end
 
         function Dropdown:Refresh(List)
-            Popup:Clear()
-            Dropdown.Options = List
-
-            for _, Option in List do
-                Popup:AddRow(tostring(Option))
-            end
-        end
+    Popup:Clear()
+    Dropdown.Options = List
+    for _, Option in List do Popup:AddRow(tostring(Option)) end
+    if Dropdown.Pending ~= nil then
+        local P = Dropdown.Pending
+        Dropdown.Pending = nil
+        Dropdown:Set(P)
+    end
+end
 
         function Dropdown:Set(Value)
             if Dropdown.Multi then
@@ -5160,7 +5197,7 @@ end)
                     if Data.Name == Value then Found = true end
                 end
 
-                if not Found then return end
+                if not Found then Dropdown.Pending = Value return end
 
                 Dropdown.Value = Value
 
@@ -5344,7 +5381,7 @@ if not Library.UIEnabled then
             Name = Params.Name or "Keybind",
             Key = Params.Default,
             Flag = Params.Flag,
-            Callback = Params.Callback or function() end,
+            OnChanged = Params.OnChanged,
             Picking = false,
             IsOpen = false,
             Debounce = false,
@@ -5442,14 +5479,16 @@ if not Library.UIEnabled then
         })
 
         function Keybind:Set(Key)
-            Keybind.Key = Key
-            PanelKey.Instance.Text = KeyName(Key)
-            Keybind.Picking = false
+    Keybind.Key = Key
+    PanelKey.Instance.Text = KeyName(Key)
+    Keybind.Picking = false
 
-            if Keybind.Flag then
-                Library.Flags[Keybind.Flag] = Key and tostring(Key) or "None"
-            end
-        end
+    if Keybind.Flag then
+        Library.Flags[Keybind.Flag] = Key and tostring(Key) or "None"
+    end
+
+    Library:SafeCall(Keybind.OnChanged, Key)
+end
 
         function Keybind:Get()
             return Keybind.Key
@@ -5723,6 +5762,14 @@ if not Library.UIEnabled then
             Z = 5
         })
 
+        Library:Connect(Items.NameInput.Instance:GetPropertyChangedSignal("Text"), function()
+        local Text = Items.NameInput.Instance.Text
+
+        if #Text > 20 then
+            Items.NameInput.Instance.Text = string.sub(Text, 1, 20)
+        end
+    end)
+
         Items.Create = MakeFrame({
             Parent = Items.CreateBox.Instance,
             Anchor = Vector2.new(1, 0),
@@ -5753,11 +5800,75 @@ if not Library.UIEnabled then
         })
 
         Items.ListHolder = MakeFrame({
-            Parent = Page.Instance,
-            Pos = UDim2.fromOffset(0, 52),
-            Size = UDim2.fromOffset(ColW, ContentH - 52),
-            Z = 3
+	    Parent = Page.Instance,
+	    Pos = UDim2.fromOffset(0, 104),
+	    Size = UDim2.fromOffset(ColW, ContentH - 104),
+	    Z = 3
         })
+
+        Items.ImportBox = MakeFrame({
+    Parent = Page.Instance,
+    Pos = UDim2.fromOffset(0, 52),
+    Size = UDim2.fromOffset(ColW, 40),
+    Z = 3
+})
+
+Items.ImportField = MakeFrame({
+    Parent = Items.ImportBox.Instance,
+    Size = UDim2.fromOffset(ColW - 94, 40),
+    Color = "Element",
+    Round = 6,
+    Clip = true,
+    Z = 4
+})
+
+MakeImage({
+    Parent = Items.ImportField.Instance,
+    Icon = "clipboard",
+    Anchor = Vector2.new(0, 0.5),
+    Pos = UDim2.new(0, 12, 0.5, 0),
+    Size = UDim2.fromOffset(14, 14),
+    Color = "DimText",
+    Z = 5
+})
+
+Items.ImportInput = MakeInput({
+    Parent = Items.ImportField.Instance,
+    Placeholder = "paste config json",
+    Pos = UDim2.fromOffset(34, 0),
+    Size = UDim2.new(1, -44, 1, 0),
+    TextSize = 15,
+    Z = 5
+})
+
+Items.Import = MakeFrame({
+    Parent = Items.ImportBox.Instance,
+    Anchor = Vector2.new(1, 0),
+    Pos = UDim2.new(1, 0, 0, 0),
+    Size = UDim2.fromOffset(84, 40),
+    Color = "Element",
+    Round = 6,
+    Clip = true,
+    Z = 4
+})
+
+HoverSwap(Items.Import)
+Items.ImportSweep = MakeSweep(Items.Import.Instance, 5)
+
+MakeText({
+    Parent = Items.Import.Instance,
+    Text = "Import",
+    TextSize = 15,
+    Size = UDim2.new(1, 0, 1, 0),
+    Color = "Text",
+    Align = Enum.TextXAlignment.Center,
+    Z = 6
+})
+
+Items.ImportHit = MakeButton({
+    Parent = Items.Import.Instance,
+    Z = 7
+})
 
         Items.List = Library:Create("ScrollingFrame", {
             Parent = Items.ListHolder.Instance,
@@ -6094,7 +6205,7 @@ if not Library.UIEnabled then
                 TextSize = 15,
                 Anchor = Vector2.new(0, 0.5),
                 Pos = UDim2.new(0, 15, 0.5, 0),
-                Size = UDim2.fromOffset(ColW - 130, 20),
+                Size = UDim2.fromOffset(ColW - 156, 20),
                 Color = "DimText",
                 Truncate = true,
                 Z = 5
@@ -6105,6 +6216,58 @@ if not Library.UIEnabled then
                 Slot = Slot,
                 Row = Row
             }
+
+            local AutoImage = MakeImage({
+    Parent = Row.Instance,
+    Icon = "zap",
+    Anchor = Vector2.new(1, 0.5),
+    Pos = UDim2.new(1, -94, 0.5, 0),
+    Size = UDim2.fromOffset(15, 15),
+    Color = "DimText",
+    Z = 5
+})
+
+local AutoHit = MakeButton({
+    Parent = Row.Instance,
+    Anchor = Vector2.new(1, 0.5),
+    Pos = UDim2.new(1, -87, 0.5, 0),
+    Size = UDim2.fromOffset(28, 28),
+    Z = 6
+})
+
+function Data:SetAutoloadVisual(Active)
+    Data.IsAutoload = Active
+    AutoImage:ChangeItemTheme({ ImageColor3 = Active and "Accent" or "DimText" })
+    AutoImage:Tween({ ImageColor3 = Active and Library.Theme.Accent or Library.Theme.DimText })
+end
+
+AutoHit:OnHover(function()
+    if Data.IsAutoload then return end
+    AutoImage:Tween({ ImageColor3 = Library.Theme.Text })
+end, function()
+    if Data.IsAutoload then return end
+    AutoImage:Tween({ ImageColor3 = Library.Theme.DimText })
+end)
+
+AutoHit:Connect("MouseButton1Down", function()
+    local Enabled = Library:GetAutoload() ~= Name
+
+    if Enabled then
+        Library:SetAutoload(Name)
+    else
+        Library:ClearAutoload()
+    end
+
+    for _, Other in Config.Rows do
+        Other:SetAutoloadVisual(Enabled and Other.Name == Name)
+    end
+
+    Library:Notification({
+        Name = Enabled and "Autoload set" or "Autoload cleared",
+        Description = Enabled and ("\"" .. Name .. "\" will load on execute.") or "No config will autoload.",
+        Icon = "zap"
+    })
+end)
 
             local function IconButton(Offset, Icon, Callback)
                 local Image = MakeImage({
@@ -6168,6 +6331,9 @@ if not Library.UIEnabled then
             IconButton(-14, "trash-2", function()
                 if Data.Removing then return end
                 Data.Removing = true
+                    if Library:GetAutoload() == Name then
+        Library:ClearAutoload()
+    end
 
                 if delfile and isfile and isfile(ConfigPath(Name)) then
                     delfile(ConfigPath(Name))
@@ -6215,7 +6381,7 @@ if not Library.UIEnabled then
 
             local Hit = MakeButton({
                 Parent = Row.Instance,
-                Size = UDim2.new(1, -96, 1, 0),
+                Size = UDim2.new(1, -122, 1, 0),
                 Z = 5
             })
 
@@ -6244,6 +6410,126 @@ if not Library.UIEnabled then
             return Data
         end
 
+        local function IsValidConfig(Decoded)
+    if type(Decoded) ~= "table" then return false end
+    if Decoded.__version or Decoded.__theme or Decoded.__accent then return true end
+
+    for Key in Decoded do
+        if Library.SetFlags[Key] then return true end
+    end
+
+    return false
+end
+
+local function UniqueName(Base)
+    Base = string.sub(Base, 1, 16)
+    local Name = Base
+    local Count = 1
+
+    while isfile and isfile(ConfigPath(Name)) do
+        Count += 1
+        Name = Base .. " " .. Count
+    end
+
+    return Name
+end
+
+local function TryImport(Raw)
+    Raw = string.match(Raw or "", "^%s*(.-)%s*$")
+    if Raw == "" then return false end
+
+    local Ok, Decoded = pcall(function()
+        return HttpService:JSONDecode(Raw)
+    end)
+
+    if not Ok or not IsValidConfig(Decoded) then return false end
+    if not Library:LoadConfig(Raw) then return false end
+
+    Items.ImportInput.Instance.Text = ""
+
+    if RefreshThemeUI then
+        RefreshThemeUI()
+    end
+
+    -- save it as a real config so it shows up in the list
+    local Name = string.gsub(Items.NameInput.Instance.Text, "[^%w _%-]", "")
+    Name = string.match(Name, "^%s*(.-)%s*$")
+
+    if Name == "" then
+        Name = "imported"
+    end
+
+    Name = UniqueName(Name)
+
+    local Saved = false
+
+    if writefile then
+        Saved = pcall(writefile, ConfigPath(Name), Raw)
+    end
+
+    if Saved then
+        Items.NameInput.Instance.Text = ""
+        Config.Selected = Name
+        RefreshList()
+        ShowInfo(Name)
+
+        Library:Notification({
+            Name = "Config imported",
+            Description = "Saved as \"" .. Name .. "\" and loaded.",
+            Icon = "check"
+        })
+    else
+        Library:Notification({
+            Name = "Config imported",
+            Description = "Loaded, but it couldn't be saved to a file.",
+            Icon = "triangle-alert"
+        })
+    end
+
+    return true
+end
+
+local function ImportFailed()
+    Items.ImportInput.Instance.Text = ""
+
+    Library:Notification({
+        Name = "Import failed",
+        Description = "That text isn't a valid config.",
+        Icon = "triangle-alert"
+    })
+end
+
+-- auto-load the moment a valid config is pasted
+Library:Connect(Items.ImportInput.Instance:GetPropertyChangedSignal("Text"), function()
+    TryImport(Items.ImportInput.Instance.Text)
+end)
+
+-- if they leave the box with something that never parsed, tell them
+Items.ImportInput:Connect("FocusLost", function()
+    if Items.Import:IsMouseOverFrame() then return end
+
+    local Text = Items.ImportInput.Instance.Text
+    if Text ~= "" and not TryImport(Text) then
+        ImportFailed()
+    end
+end)
+
+-- button: use typed/pasted text, or fall back to the real clipboard
+Items.ImportHit:Connect("MouseButton1Down", function()
+    PlaySweep(Items.ImportSweep.Instance)
+
+    local Raw = Items.ImportInput.Instance.Text
+
+    if Raw == "" and getclipboard then
+        local Ok, Clip = pcall(getclipboard)
+        if Ok then Raw = Clip end
+    end
+
+    if not TryImport(Raw) then
+        ImportFailed()
+    end
+end)
+
         RefreshList = function()
             for _, Data in Config.Rows do
                 Data.Slot.Instance:Destroy()
@@ -6254,6 +6540,7 @@ if not Library.UIEnabled then
             for Index, Name in Library:ListConfigs() do
                 local Data = AddRow(Index, Name)
                 Data:SetSelected(Name == Config.Selected)
+                Data:SetAutoloadVisual(Name == Library:GetAutoload())
             end
 
             local Height = #Config.Rows * 52
@@ -6264,6 +6551,7 @@ if not Library.UIEnabled then
             PlaySweep(Items.CreateSweep.Instance)
 
             local Name = string.gsub(Items.NameInput.Instance.Text, "[^%w _%-]", "")
+            Name = string.match(Name, "^%s*(.-)%s*$")
 
             if Name == "" then
                 Library:Notification({
@@ -6273,6 +6561,11 @@ if not Library.UIEnabled then
                 })
 
                 return
+            end
+
+            if #Name > 20 then
+                Name = string.sub(Name, 1, 20)
+                Name = string.match(Name, "^%s*(.-)%s*$")
             end
 
             if isfile and isfile(ConfigPath(Name)) then
@@ -6299,11 +6592,12 @@ if not Library.UIEnabled then
         end)
 
         local Blocks = {
-            { Frame = Items.CreateBox, Home = UDim2.fromOffset(0, 0) },
-            { Frame = Items.ListHolder, Home = UDim2.fromOffset(0, 52) },
-            { Frame = Items.InfoPanel, Home = UDim2.fromOffset(Col2X, 0) },
-            { Frame = Items.ThemePanel, Home = UDim2.fromOffset(Col2X, 216) }
-        }
+    { Frame = Items.CreateBox, Home = UDim2.fromOffset(0, 0) },
+    { Frame = Items.ImportBox, Home = UDim2.fromOffset(0, 52) },
+    { Frame = Items.ListHolder, Home = UDim2.fromOffset(0, 104) },
+    { Frame = Items.InfoPanel, Home = UDim2.fromOffset(Col2X, 0) },
+    { Frame = Items.ThemePanel, Home = UDim2.fromOffset(Col2X, 216) }
+}
 
         local BlockSlide = 30
         local BlockStep = 0.06
@@ -6504,167 +6798,6 @@ if not Library.UIEnabled then
         return Watermark
     end
 
-Library.ArrayList = function(Self, Params)
-        Params = Params or { }
-
-        if Library.ArrayListBar then
-            return Library.ArrayListBar
-        end
-
-        Library.ListState = Library.ListState or { }
-
-        local TextSize = Params.TextSize or 18
-        local RowHeight = TextSize + 6
-        local Margin = Params.Margin or 8
-        local Glow = Params.Glow ~= false
-        local Fade = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-
-        local Entries = { }
-        local List = { }
-
-        local Root = MakeFrame({
-            Parent = Library.Holder.Instance,
-            Anchor = Vector2.new(1, 0),
-            Pos = UDim2.new(1, -Margin, 0, Margin),
-            Size = UDim2.fromOffset(0, 0),
-            Z = 55
-        })
-
-        Root.Instance.AutomaticSize = Enum.AutomaticSize.XY
-
-        Library:Create("UIListLayout", {
-            Parent = Root.Instance,
-            FillDirection = Enum.FillDirection.Vertical,
-            HorizontalAlignment = Enum.HorizontalAlignment.Right,
-            SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 0)
-        })
-
-        local function Build(Name)
-            local Entry = { Name = Name }
-
-            local Width = MeasureText(Name, TextSize, 1000, UiFont).X
-
-            Entry.Row = MakeFrame({
-                Parent = Root.Instance,
-                Size = UDim2.fromOffset(0, 0),
-                Clip = true,
-                Z = 56
-            })
-
-            Entry.Row.Instance.AutomaticSize = Enum.AutomaticSize.X
-            -- longest name on top (negative width = sorted first)
-            Entry.Row.Instance.LayoutOrder = -math.floor(Width)
-
-            Entry.Label = MakeText({
-                Parent = Entry.Row.Instance,
-                Text = Name,
-                TextSize = TextSize,
-                Size = UDim2.fromOffset(0, RowHeight),
-                Color = "Accent",
-                Align = Enum.TextXAlignment.Right,
-                Z = 57
-            })
-
-            Entry.Label.Instance.AutomaticSize = Enum.AutomaticSize.X
-            Entry.Label.Instance.TextTransparency = 1
-
-            Library:Create("UIPadding", {
-                Parent = Entry.Label.Instance,
-                PaddingLeft = UDim.new(0, 4),
-                PaddingRight = UDim.new(0, 10)
-            })
-
-            if Glow then
-                Entry.Stroke = Library:Create("UIStroke", {
-                    Parent = Entry.Label.Instance,
-                    Color = Library.Theme.Accent,
-                    Thickness = 1.5,
-                    Transparency = 1,
-                    ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
-                    LineJoinMode = Enum.LineJoinMode.Round
-                }):AddToTheme({ Color = "Accent" })
-            end
-
-            -- the accent bar on the right edge
-            Entry.Bar = MakeFrame({
-                Parent = Entry.Row.Instance,
-                Anchor = Vector2.new(1, 0),
-                Pos = UDim2.new(1, 0, 0, 0),
-                Size = UDim2.new(0, 2, 1, 0),
-                Color = "Accent",
-                Z = 58
-            })
-
-            Entry.Bar.Instance.BackgroundTransparency = 1
-
-            return Entry
-        end
-
-        function List:Set(Name, State)
-            State = State and true or false
-            Library.ListState[Name] = State
-
-            local Entry = Entries[Name]
-
-            if State and not Entry then
-                Entry = Build(Name)
-                Entries[Name] = Entry
-
-                Library:Tween({ Size = UDim2.fromOffset(0, RowHeight) }, Fade, Entry.Row.Instance)
-                Library:Tween({ TextTransparency = 0 }, Fade, Entry.Label.Instance)
-                Library:Tween({ BackgroundTransparency = 0 }, Fade, Entry.Bar.Instance)
-
-                if Entry.Stroke then
-                    Library:Tween({ Transparency = 0.75 }, Fade, Entry.Stroke.Instance)
-                end
-            elseif not State and Entry then
-                Entries[Name] = nil
-
-                Library:Tween({ Size = UDim2.fromOffset(0, 0) }, Fade, Entry.Row.Instance)
-                Library:Tween({ TextTransparency = 1 }, Fade, Entry.Label.Instance)
-                Library:Tween({ BackgroundTransparency = 1 }, Fade, Entry.Bar.Instance)
-
-                if Entry.Stroke then
-                    Library:Tween({ Transparency = 1 }, Fade, Entry.Stroke.Instance)
-                end
-
-                task.delay(0.25, function()
-                    if Entry.Row.Instance then
-                        Entry.Row.Instance:Destroy()
-                    end
-                end)
-            end
-        end
-
-        function List:Add(Name)
-            List:Set(Name, true)
-        end
-
-        function List:Remove(Name)
-            List:Set(Name, false)
-        end
-
-        function List:SetVisible(Bool)
-            Root.Instance.Visible = Bool and true or false
-        end
-
-        function List:SetPosition(Pos, Anchor)
-            Root.Instance.AnchorPoint = Anchor or Root.Instance.AnchorPoint
-            Root.Instance.Position = Pos
-        end
-
-        -- pick up toggles that were already ON before the list existed
-        for Name, State in Library.ListState do
-            if State then
-                List:Set(Name, true)
-            end
-        end
-
-        Library.ArrayListBar = List
-        return List
-    end
-
     Library.GetConfig = function(Self, Created)
         local Config = { }
 
@@ -6683,6 +6816,7 @@ Library.ArrayList = function(Self, Params)
         end
 
         Config.__accent = Library.Theme.Accent:ToHex()
+        Config.__menukey = Library.MenuKeybind and tostring(Library.MenuKeybind) or "None"
         Config.__theme = ThemeColors
         Config.__created = Created or os.date("%d.%m.%Y %H:%M")
         Config.__version = Library.Version
@@ -6697,19 +6831,33 @@ Library.ArrayList = function(Self, Params)
         end)
 
         if not Ok or type(Decoded) ~= "table" then return false end
+        if type(Decoded.__menukey) == "string" then
+    local Key = ParseKey(Decoded.__menukey)
 
+    if Key then
+        Library.MenuKeybind = Key
+
+        if Library.OnMenuKeyChanged then
+            Library.OnMenuKeyChanged()
+        end
+    end
+end
         Library.Silent = true
 
         for Index, Value in Decoded do
-            local SetFunction = Library.SetFlags[Index]
-            if not SetFunction then continue end
+    local SetFunction = Library.SetFlags[Index]
+    if not SetFunction then continue end
 
-            if type(Value) == "table" and Value.__color then
-                SetFunction(Color3.fromHex(Value.__color), Value.__alpha)
-            else
-                SetFunction(Value)
-            end
+    local Ok, Err = pcall(function()
+        if type(Value) == "table" and Value.__color then
+            SetFunction(Color3.fromHex(Value.__color), Value.__alpha)
+        else
+            SetFunction(Value)
         end
+    end)
+
+    if not Ok then warn("[config] flag failed:", Index, Err) end
+end
 
         if type(Decoded.__theme) == "table" then
             for Key, Hex in Decoded.__theme do
@@ -6736,6 +6884,51 @@ Library.ArrayList = function(Self, Params)
         writefile(Library.ConfigFolder .. "/" .. Name .. ".json", Library:GetConfig())
         return true
     end
+
+    Library.AutoloadPath = function(Self)
+    return Library.Directory .. "/autoload.txt"
+end
+
+Library.GetAutoload = function(Self)
+    if not isfile or not isfile(Library:AutoloadPath()) then return nil end
+
+    local Name = string.match(readfile(Library:AutoloadPath()), "^%s*(.-)%s*$")
+    if not Name or Name == "" then return nil end
+
+    if not isfile(Library.ConfigFolder .. "/" .. Name .. ".json") then return nil end
+
+    return Name
+end
+
+Library.SetAutoload = function(Self, Name)
+    if not writefile then return false end
+    writefile(Library:AutoloadPath(), Name)
+    return true
+end
+
+Library.ClearAutoload = function(Self)
+    if delfile and isfile and isfile(Library:AutoloadPath()) then
+        delfile(Library:AutoloadPath())
+    end
+end
+
+Library.LoadAutoload = function(Self)
+    local Name = Library:GetAutoload()
+    if not Name then return false end
+
+    local Ok = Library:LoadConfigFile(Name)
+
+    if Ok then
+        Library:Notification({
+            Name = "Autoload",
+            Description = "Loaded config \"" .. Name .. "\".",
+            Icon = "zap",
+            Duration = 3
+        })
+    end
+
+    return Ok
+end
 
     Library.LoadConfigFile = function(Self, Name)
         if not isfile then return false end
