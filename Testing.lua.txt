@@ -3138,6 +3138,45 @@ end
             Z = 2
         })
 
+        Items.Footer = MakeText({
+    Parent = Items.Main.Instance,
+    Text = "discord.gg/auralhub",
+    TextSize = 13,
+    Anchor = Vector2.new(1, 1),
+    Pos = UDim2.new(1, -14, 1, -8),
+    Size = UDim2.fromOffset(200, 16),
+    Color = "DimText",
+    Align = Enum.TextXAlignment.Right,
+    Z = 3
+})
+
+        Items.FooterHit = MakeButton({
+    Parent = Items.Main.Instance,
+    Anchor = Vector2.new(1, 1),
+    Pos = UDim2.new(1, -10, 1, -4),
+    Size = UDim2.fromOffset(150, 24),
+    Z = 4
+})
+
+Items.FooterHit:OnHover(function()
+    Items.Footer:Tween({ TextColor3 = Library.Theme.Text })
+end, function()
+    Items.Footer:Tween({ TextColor3 = Library.Theme.DimText })
+end)
+
+Items.FooterHit:Connect("MouseButton1Down", function()
+    if setclipboard then
+        pcall(setclipboard, "https://discord.gg/auralhub")
+    end
+
+    Library:Notification({
+        Name = "Discord copied",
+        Description = "Invite link copied to your clipboard.",
+        Icon = "copy",
+        Duration = 3
+    })
+end)
+
         Window.Items = Items
 
         Items.Root:MakeDraggable(Items.Main.Instance)
