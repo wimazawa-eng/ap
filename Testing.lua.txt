@@ -4520,7 +4520,7 @@ end)
             Keybind:SetMode(Keybind.Mode, true)
             Keybind:Set(Keybind.Key)
             Library:AddKeybindSource({
-            Name = Toggle.Name,
+            Name = KParams.ListName or Toggle.Name,
             Key = function() return Keybind.Key end,
             Active = function() return Toggle.Value end
             })
@@ -5552,10 +5552,10 @@ if not Library.UIEnabled then
             end
         end
         Library:AddKeybindSource({
-        Name = Keybind.Name,
+        Name = KParams.ListName or Toggle.Name,
         Key = function() return Keybind.Key end,
         Active = function() return false end
-        })
+})
         return setmetatable(Keybind, Library)
     end
 
