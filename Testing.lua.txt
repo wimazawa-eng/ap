@@ -5552,7 +5552,7 @@ if not Library.UIEnabled then
             end
         end
         Library:AddKeybindSource({
-        Name = KParams.ListName or Toggle.Name,
+        Name = Params.ListName or Keybind.Name,
         Key = function() return Keybind.Key end,
         Active = function() return false end
 })
