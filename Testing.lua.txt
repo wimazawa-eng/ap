@@ -4795,6 +4795,35 @@ end)
         Slider.Items = Items
         Items.Knob = MakeKnob(Items.Track.Instance)
 
+        Items.Value.Instance.Visible = false -- hide the old label, the box replaces it
+
+Items.Input = MakeInput({
+    Parent = Items.Row.Instance,
+    Pos = UDim2.new(1, -95, 0, 3),
+    Size = UDim2.fromOffset(80, 20),
+    TextSize = 15,
+    Align = Enum.TextXAlignment.Right,
+    Z = 9
+})
+
+Items.Input:ChangeItemTheme({ TextColor3 = "DimText", PlaceholderColor3 = "DimText" })
+Items.Input.Instance.TextColor3 = Library.Theme.DimText
+
+Items.Input:Connect("Focused", function()
+    -- show only the number while editing
+    Items.Input.Instance.Text = tostring(Slider.Value)
+end)
+
+Items.Input:Connect("FocusLost", function()
+    local Typed = tonumber(string.match(Items.Input.Instance.Text, "-?%d+%.?%d*"))
+
+    if Typed then
+        Slider:Set(Typed)
+    else
+        Items.Input.Instance.Text = tostring(Slider.Value) .. Slider.Suffix
+    end
+end)
+
         function Slider:Set(Value, Instant)
             local Clamped = math.clamp(Value, Slider.Min, Slider.Max)
             Slider.Value = Library:Round(Clamped, Slider.Decimals)
@@ -4810,7 +4839,12 @@ end)
             Library:Tween({ Size = UDim2.fromOffset(Fraction * TrackW, 10) }, Info, Items.Fill.Instance)
             Library:Tween({ Position = UDim2.new(Fraction, 0, 0.5, 0) }, Info, Items.Knob.Instance)
 
-            Items.Value.Instance.Text = tostring(Slider.Value) .. Slider.Suffix
+            local Display = tostring(Slider.Value) .. Slider.Suffix
+            Items.Value.Instance.Text = Display
+
+            if not Items.Input.Instance:IsFocused() then
+            Items.Input.Instance.Text = Display
+        end
             Library:SafeCall(Slider.Callback, Slider.Value)
         end
 
