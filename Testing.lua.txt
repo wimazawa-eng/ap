@@ -4229,6 +4229,7 @@ if not Library.UIEnabled then
 
         function Toggle:Set(Bool)
             Toggle.Value = Bool and true or false
+            Library.KeybindListDirty = true
 
             if Toggle.Flag then
                 Library.Flags[Toggle.Flag] = Toggle.Value
@@ -4452,7 +4453,7 @@ end)
                 for _, Data in ModeRows do
                     Data.SetActive(Data.Name == Mode, Instant)
                 end
-
+                Library.KeybindListDirty = true
                 SaveFlag()
             end
 
@@ -4460,7 +4461,7 @@ end)
                 Keybind.Key = Key
                 PanelKey.Instance.Text = KeyName(Key)
                 Keybind.Picking = false
-
+                Library.KeybindListDirty = true
                 SaveFlag()
             end
 
@@ -4518,7 +4519,11 @@ end)
 
             Keybind:SetMode(Keybind.Mode, true)
             Keybind:Set(Keybind.Key)
-
+            Library:AddKeybindSource({
+            Name = Toggle.Name,
+            Key = function() return Keybind.Key end,
+            Active = function() return Toggle.Value end
+            })
             return Keybind
         end
 
@@ -5482,6 +5487,7 @@ if not Library.UIEnabled then
     Keybind.Key = Key
     PanelKey.Instance.Text = KeyName(Key)
     Keybind.Picking = false
+    Library.KeybindListDirty = true
 
     if Keybind.Flag then
         Library.Flags[Keybind.Flag] = Key and tostring(Key) or "None"
@@ -5545,7 +5551,11 @@ if not Library.UIEnabled then
                 Keybind:Set(ParseKey(Value))
             end
         end
-
+        Library:AddKeybindSource({
+        Name = Keybind.Name,
+        Key = function() return Keybind.Key end,
+        Active = function() return false end
+        })
         return setmetatable(Keybind, Library)
     end
 
@@ -6954,12 +6964,172 @@ end
         return Result
     end
 
+    Library.KeybindSources = { }
+Library.KeybindListDirty = false
+Library.KeybindListEnabled = true
+
+Library.AddKeybindSource = function(Self, Source)
+    table.insert(Library.KeybindSources, Source)
+    Library.KeybindListDirty = true
+    return Source
+end
+
+Library.KeybindList = function(Self, Params)
+    if IsMobile then return nil end
+    if Library.KeybindListHandle then return Library.KeybindListHandle end
+
+    Params = Params or { }
+
+    local Items = { }
+    local Width = Params.Width or 170
+
+    Items.Bar = MakeFrame({
+        Parent = Library.Holder.Instance,
+        Anchor = Vector2.new(0, 0.5),
+        Pos = UDim2.new(0, 14, 0.5, 0),
+        Size = UDim2.fromOffset(Width, 0),
+        Color = "Section",
+        Round = 8,
+        Z = 60
+    })
+
+    Items.Bar.Instance.AutomaticSize = Enum.AutomaticSize.Y
+    Items.Bar.Instance.Visible = false
+
+    Library:Create("UIPadding", {
+        Parent = Items.Bar.Instance,
+        PaddingTop = UDim.new(0, 8),
+        PaddingBottom = UDim.new(0, 8),
+        PaddingLeft = UDim.new(0, 10),
+        PaddingRight = UDim.new(0, 10)
+    })
+
+    Library:Create("UIListLayout", {
+        Parent = Items.Bar.Instance,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 2)
+    })
+
+    local Title = MakeFrame({
+        Parent = Items.Bar.Instance,
+        Size = UDim2.new(1, 0, 0, 22),
+        Z = 61
+    })
+
+    Title.Instance.LayoutOrder = 0
+
+    MakeImage({
+        Parent = Title.Instance,
+        Icon = "keyboard",
+        Pos = UDim2.fromOffset(0, 3),
+        Size = UDim2.fromOffset(16, 16),
+        Color = "Accent",
+        Z = 62
+    })
+
+    MakeText({
+        Parent = Title.Instance,
+        Text = Params.Name or "Keybinds",
+        TextSize = 15,
+        Pos = UDim2.fromOffset(22, 0),
+        Size = UDim2.new(1, -22, 1, 0),
+        Color = "Text",
+        Z = 62
+    })
+
+    Items.Bar:MakeDraggable()
+
+    local function BuildRow(Source, Order)
+        local Frame = MakeFrame({
+            Parent = Items.Bar.Instance,
+            Size = UDim2.new(1, 0, 0, 20),
+            Z = 61
+        })
+
+        Frame.Instance.LayoutOrder = Order
+
+        local Name = MakeText({
+            Parent = Frame.Instance,
+            Text = Source.Name,
+            TextSize = 14,
+            Size = UDim2.new(1, -64, 1, 0),
+            Color = "DimText",
+            Truncate = true,
+            Z = 62
+        })
+
+        local Key = MakeText({
+            Parent = Frame.Instance,
+            Text = "",
+            TextSize = 14,
+            Anchor = Vector2.new(1, 0),
+            Pos = UDim2.new(1, 0, 0, 0),
+            Size = UDim2.fromOffset(60, 20),
+            Color = "DimText",
+            Align = Enum.TextXAlignment.Right,
+            Truncate = true,
+            Z = 62
+        })
+
+        Source.Row = { Frame = Frame, Name = Name, Key = Key }
+    end
+
+    Library.RefreshKeybindList = function(Self2)
+        local Shown = 0
+
+        for Index, Source in Library.KeybindSources do
+            if not Source.Row then
+                BuildRow(Source, Index)
+            end
+
+            local Key = Source.Key()
+            local Has = Key ~= nil
+            local Active = Has and Source.Active() or false
+            local Row = Source.Row
+
+            Row.Frame.Instance.Visible = Has
+
+            if Has then
+                Shown += 1
+                Row.Key.Instance.Text = "[" .. KeyName(Key) .. "]"
+
+                Row.Name:ChangeItemTheme({ TextColor3 = Active and "Text" or "DimText" })
+                Row.Key:ChangeItemTheme({ TextColor3 = Active and "Accent" or "DimText" })
+
+                Row.Name:Tween({
+                    TextColor3 = Active and Library.Theme.Text or Library.Theme.DimText
+                })
+                Row.Key:Tween({
+                    TextColor3 = Active and Library.Theme.Accent or Library.Theme.DimText
+                })
+            end
+        end
+
+        Items.Bar.Instance.Visible = Library.KeybindListEnabled and Shown > 0
+    end
+
+    local Handle = { Instance = Items.Bar.Instance }
+
+    function Handle:SetVisible(Bool)
+        Library.KeybindListEnabled = Bool and true or false
+        Library:RefreshKeybindList()
+    end
+
+    Library.KeybindListHandle = Handle
+    Library.KeybindListDirty = true
+
+    return Handle
+end
+
     Library:Connect(RunService.Heartbeat, function(Delta)
         if Library.ThemeDirty then
             Library.ThemeDirty = false
             Library:ApplyThemeInstant()
         end
-
+        if Library.KeybindListDirty and Library.RefreshKeybindList then
+        Library.KeybindListDirty = false
+        Library:RefreshKeybindList()
+        end
         if not Library.PreloadDirty then return end
 
         Library.PreloadClock += Delta or 0
